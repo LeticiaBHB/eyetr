@@ -18,3 +18,10 @@
 // adb shell am start -n com.seupacote/.MainActivity
 
 // & "C:\Users\Leticia\AppData\Local\Android\Sdk\platform-tools\adb.exe" shell am start -n com.example.myapplication/.MainActivity
+
+
+
+
+//./gradlew clean
+//./gradlew build
+//./gradlew installDebug

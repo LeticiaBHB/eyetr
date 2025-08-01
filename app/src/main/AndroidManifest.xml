@@ -3,10 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Permissão da câmera -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.CAMERA" />
-
-    <!-- Declara que o app usa câmera frontal (opcional) -->
-    <uses-feature android:name="android.hardware.camera.front" android:required="false" />
 
     <application
         android:allowBackup="true"
