@@ -1,0 +1,20 @@
+{
+    // Use o IntelliSense para saber mais sobre os atributos possíveis.
+    // Focalizar para exibir as descrições dos atributos existentes.
+    // Para obter mais informações, acesse: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "PlatformIO Debugger",
+            "request": "launch",
+            "type": "platformio-debug",
+            "toolchainBinDir": "/usr/local/bin"
+        },
+    ]
+}
+//./gradlew installDebug
+
+// adb shell am start -n com.seupacote/.MainActivity
+
+// & "C:\Users\Leticia\AppData\Local\Android\Sdk\platform-tools\adb.exe" shell am start -n com.example.myapplication/.MainActivity
