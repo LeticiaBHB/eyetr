@@ -47,6 +47,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.DisposableEffect
 import androidx.camera.core.ExperimentalGetImage
 import android.graphics.Rect
+import android.graphics.PointF
+import android.graphics.*
+import android.util.DisplayMetrics
 
 class MainActivity : ComponentActivity() {
     private lateinit var cameraExecutor: ExecutorService
@@ -153,8 +156,10 @@ fun CameraPreview() {
     // Configuração do detector de faces
     val faceDetector = remember {
         val options = FaceDetectorOptions.Builder()
-            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-            .setContourMode(FaceDetectorOptions.CONTOUR_MODE_NONE)
+            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE) // Modo mais preciso
+            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL) // Detectar todos os pontos faciais
+            .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL) // Detectar todos os contornos
+            .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL) // Classificar sorrisos, olhos abertos, etc.
             .build()
 
         FaceDetection.getClient(options)
@@ -251,20 +256,39 @@ fun CameraPreview() {
 class FaceGraphicOverlay(context: Context) : View(context) {
     private val lock = Any()
     private var previewWidth: Int = 0
-    private var widthScaleFactor = 1.0f
     private var previewHeight: Int = 0
-    private var heightScaleFactor = 1.0f
     private var facing = CameraSelector.LENS_FACING_BACK
     private val faces = mutableListOf<Face>()
+    private var faceRect: RectF? = null
+
+    // Configurações de desenho
     private val facePaint = Paint().apply {
         color = Color.GREEN
         style = Paint.Style.STROKE
-        strokeWidth = 5.0f
+        strokeWidth = 5f
+        isAntiAlias = true
     }
+
+    private val contourPaint = Paint().apply {
+        color = Color.BLUE
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+        isAntiAlias = true
+    }
+
+    private val landmarkPaint = Paint().apply {
+        color = Color.RED
+        style = Paint.Style.FILL
+        strokeWidth = 5f
+        isAntiAlias = true
+    }
+
+    private val marginPx = 20f * (context.resources.displayMetrics.densityDpi / DisplayMetrics.DENSITY_DEFAULT)
 
     fun clear() {
         synchronized(lock) {
             faces.clear()
+            faceRect = null
         }
         postInvalidate()
     }
@@ -289,38 +313,65 @@ class FaceGraphicOverlay(context: Context) : View(context) {
         super.onDraw(canvas)
 
         synchronized(lock) {
-            if (previewWidth != 0 && previewHeight != 0) {
-                widthScaleFactor = width.toFloat() / previewWidth.toFloat()
-                heightScaleFactor = height.toFloat() / previewHeight.toFloat()
-            }
-
-            for (face in faces) {
-                val rect = translateRect(RectF(face.boundingBox))
-                canvas.drawRect(rect, facePaint)
+            if (faces.isNotEmpty()) {
+                val face = faces[0] // Usa apenas o primeiro rosto detectado
+                setupFaceRect(face)
+                faceRect?.let { rect ->
+                    drawFaceContainer(canvas, rect)
+                    drawFaceContent(canvas, face, rect)
+                }
             }
         }
     }
 
-    private fun translateRect(rect: RectF): RectF {
-        val scaleX = widthScaleFactor
-        val scaleY = heightScaleFactor
+    private fun setupFaceRect(face: Face) {
+        val boundingBox = RectF(face.boundingBox)
+        val targetHeight = height / 3f // Altura do container
+        val scale = targetHeight / boundingBox.height()
+        val targetWidth = boundingBox.width() * scale
 
-        val flippedLeft = if (facing == CameraSelector.LENS_FACING_FRONT) {
-            previewWidth - rect.right
-        } else {
-            rect.left
-        }
-        val flippedRight = if (facing == CameraSelector.LENS_FACING_FRONT) {
-            previewWidth - rect.left
-        } else {
-            rect.right
-        }
-
-        return RectF(
-            flippedLeft * scaleX,
-            rect.top * scaleY,
-            flippedRight * scaleX,
-            rect.bottom * scaleY
+        faceRect = RectF(
+            width - targetWidth - marginPx,
+            height - targetHeight - marginPx,
+            width - marginPx,
+            height - marginPx
         )
+    }
+
+    private fun drawFaceContainer(canvas: Canvas, rect: RectF) {
+        // Desenha o quadrado verde no canto inferior direito
+        canvas.drawRect(rect, facePaint)
+    }
+
+    private fun drawFaceContent(canvas: Canvas, face: Face, containerRect: RectF) {
+        val faceBox = RectF(face.boundingBox)
+        val scaleX = containerRect.width() / faceBox.width()
+        val scaleY = containerRect.height() / faceBox.height()
+
+        canvas.save()
+        // Posiciona no canto inferior direito
+        canvas.translate(containerRect.left, containerRect.top)
+
+        // Desenha contornos faciais (vertical)
+        face.allContours.forEach { contour ->
+            val path = Path().apply {
+                contour.points.forEachIndexed { index, point ->
+                    val x = (point.x - faceBox.left) * scaleX
+                    val y = (point.y - faceBox.top) * scaleY
+                    if (index == 0) moveTo(x, y) else lineTo(x, y)
+                }
+                close()
+            }
+            canvas.drawPath(path, contourPaint)
+        }
+
+        // Desenha landmarks faciais (vertical)
+        face.allLandmarks.forEach { landmark ->
+            val x = (landmark.position.x - faceBox.left) * scaleX
+            val y = (landmark.position.y - faceBox.top) * scaleY
+            canvas.drawCircle(x, y, 6f, landmarkPaint)
+        }
+
+        canvas.restore()
     }
 }
