@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -38,6 +39,8 @@ fun CameraPreview() {
     val isBackCamera = remember { mutableStateOf(true) }
     val faces = remember { mutableStateOf<List<Face>>(emptyList()) }
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+    val eyePointerPosition = remember { mutableStateOf(Offset(500f, 800f)) }
+    val eyeDetector = remember { EyeMovementDetector(context) }
 
     val cameraSelector = if (isBackCamera.value)
         CameraSelector.DEFAULT_BACK_CAMERA
@@ -78,6 +81,7 @@ fun CameraPreview() {
         onDispose {
             cameraExecutor.shutdown()
             graphicOverlay.clear()
+            eyeDetector.close()
         }
     }
 
@@ -105,6 +109,19 @@ fun CameraPreview() {
                                 .addOnSuccessListener { detectedFaces ->
                                     faces.value = detectedFaces
                                     graphicOverlay.setFaces(detectedFaces)
+
+                                    if (detectedFaces.isNotEmpty()) {
+                                        val movement =
+                                            eyeDetector.detectFromLandmarks(detectedFaces[0])
+                                        eyePointerPosition.value = when (movement) {
+                                            EyeMovementDetector.EyeMovement.LEFT -> Offset(200f, eyePointerPosition.value.y)
+                                            EyeMovementDetector.EyeMovement.RIGHT -> Offset(800f, eyePointerPosition.value.y)
+                                            EyeMovementDetector.EyeMovement.UP -> Offset(eyePointerPosition.value.x, 300f)
+                                            EyeMovementDetector.EyeMovement.DOWN -> Offset(eyePointerPosition.value.x, 1300f)
+                                            EyeMovementDetector.EyeMovement.CENTER -> Offset(500f, 800f)
+                                            else -> eyePointerPosition.value
+                                        }
+                                    }
                                 }
                                 .addOnFailureListener { e ->
                                     Log.e("CameraPreview", "Face detection error", e)
@@ -148,6 +165,11 @@ fun CameraPreview() {
                     addView(graphicOverlay)
                 }
             },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        EyePointerOverlay(
+            position = eyePointerPosition.value,
             modifier = Modifier.fillMaxSize()
         )
 

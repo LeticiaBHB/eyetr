@@ -47,7 +47,7 @@ class EyeMovementDetector(context: Context) {
     fun detectFromLandmarks(face: Face): EyeMovement {
         if (interpreter == null) return EyeMovement.UNKNOWN
 
-        try {
+        return try {
             val leftEye = face.getLandmark(FaceLandmark.LEFT_EYE)?.position
             val rightEye = face.getLandmark(FaceLandmark.RIGHT_EYE)?.position
             val nose = face.getLandmark(FaceLandmark.NOSE_BASE)?.position
@@ -56,16 +56,23 @@ class EyeMovementDetector(context: Context) {
                 return EyeMovement.UNKNOWN
             }
 
-            // Lógica simplificada de detecção
-            val avgX = (leftEye.x + rightEye.x) / 2
+            // Cálculo simplificado com base nas posições médias
+            val avgEyeX = (leftEye.x + rightEye.x) / 2
+            val avgEyeY = (leftEye.y + rightEye.y) / 2
+
+            val deltaX = avgEyeX - nose.x
+            val deltaY = avgEyeY - nose.y
+
             return when {
-                avgX < nose.x - 30 -> EyeMovement.LEFT
-                avgX > nose.x + 30 -> EyeMovement.RIGHT
+                deltaX < -20 -> EyeMovement.LEFT
+                deltaX > 20 -> EyeMovement.RIGHT
+                deltaY < -20 -> EyeMovement.UP
+                deltaY > 20 -> EyeMovement.DOWN
                 else -> EyeMovement.CENTER
             }
         } catch (e: Exception) {
             Log.e("EyeMovementDetector", "Error detecting eye movement", e)
-            return EyeMovement.UNKNOWN
+            EyeMovement.UNKNOWN
         }
     }
 
